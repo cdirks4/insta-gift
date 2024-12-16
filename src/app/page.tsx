@@ -38,6 +38,8 @@ export default function Home() {
     []
   );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [username, setUsername] = useState<string>("");
+  const [inputMethod, setInputMethod] = useState<"image" | "username">("image");
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -56,18 +58,53 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      const formData = new FormData(e.currentTarget);
-      const response = await fetch("/api/gifts", {
-        method: "POST",
-        body: formData,
-      });
+      if (inputMethod === "username" && username) {
+        // Handle username-based analysis
+        const response = await fetch("/api/instagram", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ username }),
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to get recommendations");
+        if (!response.ok) {
+          throw new Error("Failed to fetch Instagram data");
+        }
+
+        const data = await response.json();
+        // Use the profile data for recommendations
+        const formData = new FormData();
+        formData.append("age", e.currentTarget.age.value);
+        formData.append("budget", e.currentTarget.budget.value);
+        formData.append("profile_data", JSON.stringify(data.profile));
+
+        const giftResponse = await fetch("/api/gifts", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!giftResponse.ok) {
+          throw new Error("Failed to get recommendations");
+        }
+
+        const giftData = await giftResponse.json();
+        setRecommendations(giftData.recommendations);
+      } else {
+        // Existing image-based analysis
+        const formData = new FormData(e.currentTarget);
+        const response = await fetch("/api/gifts", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to get recommendations");
+        }
+
+        const data = await response.json();
+        setRecommendations(data.recommendations);
       }
-
-      const data = await response.json();
-      setRecommendations(data.recommendations);
 
       // Scroll to results
       document.getElementById("results")?.scrollIntoView({
@@ -267,42 +304,84 @@ export default function Home() {
               />
             </div>
 
-            {/* Image Upload */}
-            <div className="space-y-2">
-              <label className="flex items-center text-lg font-medium text-gray-700">
-                <Camera className="w-5 h-5 mr-2 text-holiday-green" />
-                Instagram Memories (Optional)
-              </label>
-              <div className="relative">
-                <input
-                  type="file"
-                  name="instagram-grid"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="image-upload"
-                />
-                <label
-                  htmlFor="image-upload"
-                  className="flex items-center justify-center w-full px-4 py-3 rounded-lg border-2 border-dashed border-holiday-green/50 hover:border-holiday-green cursor-pointer bg-white/50 hover:bg-white/80 transition-all"
-                >
-                  {previewUrl ? (
-                    <div className="relative w-full aspect-square max-w-xs mx-auto">
-                      <Image
-                        src={previewUrl}
-                        alt="Preview"
-                        fill
-                        className="object-cover rounded-lg"
-                      />
-                    </div>
-                  ) : (
-                    <span className="text-gray-500">
-                      Share their Instagram moments
-                    </span>
-                  )}
-                </label>
-              </div>
+            {/* Input Method Toggle */}
+            <div className="flex justify-center gap-4 mb-8">
+              <button
+                type="button"
+                onClick={() => setInputMethod("image")}
+                className={`px-4 py-2 rounded-lg ${
+                  inputMethod === "image"
+                    ? "bg-holiday-green text-white"
+                    : "bg-gray-200"
+                }`}
+              >
+                Upload Image
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputMethod("username")}
+                className={`px-4 py-2 rounded-lg ${
+                  inputMethod === "username"
+                    ? "bg-holiday-green text-white"
+                    : "bg-gray-200"
+                }`}
+              >
+                Enter Username
+              </button>
             </div>
+
+            {inputMethod === "username" ? (
+              <div className="space-y-2">
+                <label className="flex items-center text-lg font-medium text-gray-700">
+                  <Instagram className="w-5 h-5 mr-2 text-holiday-red" />
+                  Instagram Username
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border-2 border-holiday-red/50 focus:border-holiday-red focus:ring-2 focus:ring-holiday-red/30"
+                  placeholder="Enter Instagram username"
+                />
+              </div>
+            ) : (
+              // Existing image upload input
+              <div className="space-y-2">
+                <label className="flex items-center text-lg font-medium text-gray-700">
+                  <Camera className="w-5 h-5 mr-2 text-holiday-green" />
+                  Instagram Memories (Optional)
+                </label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    name="instagram-grid"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="image-upload"
+                  />
+                  <label
+                    htmlFor="image-upload"
+                    className="flex items-center justify-center w-full px-4 py-3 rounded-lg border-2 border-dashed border-holiday-green/50 hover:border-holiday-green cursor-pointer bg-white/50 hover:bg-white/80 transition-all"
+                  >
+                    {previewUrl ? (
+                      <div className="relative w-full aspect-square max-w-xs mx-auto">
+                        <Image
+                          src={previewUrl}
+                          alt="Preview"
+                          fill
+                          className="object-cover rounded-lg"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-gray-500">
+                        Share their Instagram moments
+                      </span>
+                    )}
+                  </label>
+                </div>
+              </div>
+            )}
 
             {/* Submit Button */}
             <button
